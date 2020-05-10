@@ -10,7 +10,7 @@ const int size = 500; //w and h in pixels of the screen
 const int block = 10; //size of a block in pixels
 const int mapSize = size/block; //number of blocks that can fit in the screen. Will be the map matrix's dimention
 const int startx = 0, starty = 0; //the start point's coordinates
-const int endx = 49, endy = 49; //the goal's coordinates. Can't be in a pos object because the constructor needs it so it's a chicken and egg problem
+const int endx = 49, endy = 25; //the goal's coordinates. Can't be in a pos object because the constructor needs it so it's a chicken and egg problem
 const int htype = 0; //0-Euclidian h(n), 1-Manhattan, 2-h(n)=0, 3-Actual smallest distance considering 8-axis movement 
 const int gtype = 0; //type 0->f(n) = g(n) + h(n), 1->f(n)=g(n)
 const int real = 0; //indicates if the program should draw after each iteration of the algorithm
@@ -361,10 +361,19 @@ int main()
                 }
                 finish = done[finish].ind; //get current block's parent
             }
-            sf::Text subtitle(sf::String("Left arrow to unpause, Right arrow to go back to the beginning"), font, 10);
-            subtitle.setPosition(0, size);
-            subtitle.setFillColor(sf::Color::White);
-            window.draw(subtitle);
+            if(finish == -1){
+                sf::Text subtitle(sf::String("Left arrow to unpause, Right arrow to go back to the beginning"), font, 10);
+                subtitle.setPosition(0, size);
+                subtitle.setFillColor(sf::Color::White);
+                window.draw(subtitle);
+            }else{
+                std::string sub("Done tracing path. Right arrow to restart. g(n) - h(n) = ");
+                sub += std::to_string(guesses[0].g - heuristic(startx, starty));
+                sf::Text subtitle(sub, font, 10);
+                subtitle.setPosition(0, size);
+                subtitle.setFillColor(sf::Color::White);
+                window.draw(subtitle);
+            }
         }
         if(state == 3){
             guesses.clear();

@@ -9,9 +9,8 @@ const float sq2 = sqrt(2);
 const int size = 500; //w and h in pixels of the screen
 const int block = 10; //size of a block in pixels
 const int mapSize = size/block; //number of blocks that can fit in the screen. Will be the map matrix's dimention
-const int startx = 0, starty = 0; //the start point's coordinates
-const int endx = 49, endy = 25; //the goal's coordinates. Can't be in a pos object because the constructor needs it so it's a chicken and egg problem
-const int htype = 0; //0-Euclidian h(n), 1-Manhattan, 2-h(n)=0, 3-Actual smallest distance considering 8-axis movement 
+const int endx = mapSize-1, endy = mapSize-1; //the goal's coordinates. Can't be in a pos object because the constructor needs it so it's a chicken and egg problem
+const int htype = 3; //0-Euclidian h(n), 1-Manhattan, 2-h(n)=0, 3-Diagonal distance 
 const int gtype = 0; //type 0->f(n) = g(n) + h(n), 1->f(n)=g(n)
 const int real = 0; //indicates if the program should draw after each iteration of the algorithm
 const bool Qaxis = false; //indicates if the program should use diagonal movement
@@ -29,15 +28,9 @@ float heuristic(int x, int y){
     if(htype == 2)
         return 0; //0. No heuristic.
     if(htype == 3){
-        int dx = x - endx;
-        dx = dx > 0 ? dx : -dx;
-        int dy = y - endy;
-        dy = dy > 0 ? dy : -dy;
-        if(dx > dy){
-            return (dx - dy) + dy*sq2;
-        }else{
-            return (dy - dx) + dx*sq2;
-        }
+        float dx = abs(x - endx);
+        float dy = abs(y - endy);
+        return (dx + dy) + (sq2 - 2) * std::min(dx, dy);
     }
     return sqrt(pow(x - endx, 2) + pow(y - endy, 2)); //euclidian distance - default
 }
@@ -248,9 +241,7 @@ void setup(bool reset, short* map, posv *guesses){ //initializes the variables u
                 map[i * mapSize + j] = 0;
         }
     }
-    map[startx * mapSize + starty] = 2;
     map[endx * mapSize + endy] = 2;
-    guesses->push_back(pos(startx, starty, 0.0, 0, map));
 }
 
 int main()
@@ -264,12 +255,11 @@ int main()
     clock_t startTime; //Clock time of when the expanding starts
     int finish = -1; //index of the current block in the back-tracing
     bool first; //indicates if this is the first cycle of the pathfinding to record the startTime variable only at the start
+    int startx = 0, starty = 0; //the start point's coordinates
     //load font for the on-screen subtitles
     sf::Font font;
     font.loadFromFile(std::string("Vera.ttf"));
-
     setup(false, map, &guesses);
-
     sf::RenderWindow window(sf::VideoMode(size, size + 20), "Pathfinder");
     while (window.isOpen())
     {
@@ -281,10 +271,10 @@ int main()
 
             if (event.type == sf::Event::KeyPressed){
                 if(event.key.code == 72){ //right arrow
-                    if(state <= 3)state++;
+                    if(state <= 4)state++;
                 }
                 if(event.key.code == 71){ //left arrow
-                    if(state > 0) state--;
+                    if(state > 1) state--;
                 }
             }
         }
@@ -292,33 +282,59 @@ int main()
         window.clear();
         drawMap(&window, map); //draw the "map" of blocks
 
-        if(state == 0){ //wall-drawing step
-
-            if(sf::Mouse::isButtonPressed(sf::Mouse::Right)){
-                sf::Vector2i pos = sf::Mouse::getPosition(window);
-                int x, y;
-                x = (int) (pos.x / block); //get the corrected coordinates of the mouse
-                y = (int) (pos.y / block);
-                if(x >= 0 && y >= 0 && x < mapSize && y < mapSize)
-                    if(map[x * mapSize + y] == 1)
-                        map[x * mapSize + y] = 0; //set the coordinates of the mouse as empty if there is a wall
-            }
+        if(state == 0){ //setting start step
+            sf::Vector2i mpos = sf::Mouse::getPosition(window);
+            int x, y;
+            x = (int) (mpos.x / block); 
+            y = (int) (mpos.y / block);
             if(sf::Mouse::isButtonPressed(sf::Mouse::Left)){
-                sf::Vector2i pos = sf::Mouse::getPosition(window);
-                int x, y;
-                x = (int) (pos.x / block); 
-                y = (int) (pos.y / block);
-                if(x >= 0 && y >= 0 && x < mapSize && y < mapSize)
-                    if(map[x * mapSize + y] == 0)
-                        map[x * mapSize + y] = 1; //set the coordinates of the mouse as a wall if it is empty
+                if(x >= 0 && y >= 0 && x < mapSize && y < mapSize){
+                    if(map[x * mapSize + y] == 0){
+                        map[startx * mapSize + starty] = 0;
+                        startx = x;
+                        starty = y;
+                        guesses.push_back(pos(startx, starty, 0.0, 0, map));
+                        map[startx * mapSize + starty] = 2; //set the coordinates of the mouse as the start
+                        state++;
+                    }
+                }
             }
-            sf::Text subtitle(sf::String("Draw map using the Mouse. Use the RMB to remove block. -- Right Arrow to start verification"), font, 10);
+            std::string sub("Select the start with LMB. Or Right Arrow to skip.  ");
+            sub += "x = " + std::to_string(x) + "   y = " + std::to_string(y);
+            sf::Text subtitle(sub, font, 10);
             subtitle.setPosition(0, size);
             subtitle.setFillColor(sf::Color::White);
             window.draw(subtitle);
         }
 
-        if(state == 1){ //where the algorithm runs
+        if(state == 1){ //wall-drawing step
+            if(guesses.size() == 0){
+                map[startx * mapSize + starty] = 2; //set the coordinates of the mouse as the start
+                guesses.push_back(pos(startx, starty, 0.0, 0, map));
+            }
+            sf::Vector2i pos = sf::Mouse::getPosition(window);
+            int x, y;
+            x = (int) (pos.x / block); //get the corrected coordinates of the mouse
+            y = (int) (pos.y / block);
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Right)){
+                if(x >= 0 && y >= 0 && x < mapSize && y < mapSize)
+                    if(map[x * mapSize + y] == 1)
+                        map[x * mapSize + y] = 0; //set the coordinates of the mouse as empty if there is a wall
+            }
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Left)){
+                if(x >= 0 && y >= 0 && x < mapSize && y < mapSize)
+                    if(map[x * mapSize + y] == 0)
+                        map[x * mapSize + y] = 1; //set the coordinates of the mouse as a wall if it is empty
+            }
+            std::string sub("LMB to draw, RMB to erase - Right Arrow to start.  ");
+            sub += "x = " + std::to_string(x) + "   y = " + std::to_string(y);
+            sf::Text subtitle(sf::String(sub), font, 10);
+            subtitle.setPosition(0, size);
+            subtitle.setFillColor(sf::Color::White);
+            window.draw(subtitle);
+        }
+
+        if(state == 2){ //where the algorithm runs
             do{
                 if(first){
                     startTime = clock();
@@ -329,13 +345,13 @@ int main()
                     printf("Clock ticks spent: %ld\n", (long)(clock() - startTime));
                     printf("Success! Total distance = %f vs h(0) = %f\n", guesses[0].g, heuristic(startx, starty));
                     finish = guesses[0].ind; //the path's last index, to track the smallest path
-                    state = 2;
+                    state = 3;
                     donePath = false;
                     break;
                 }
                 if(guesses.size() == 0){ //if there are no more blocks in consideration
                     printf("Failed to find a path\n");
-                    state = 2;
+                    state = 3;
                     finish = -1;
                     break;
                 }
@@ -346,8 +362,7 @@ int main()
             window.draw(subtitle);
         }
         
-        if(state == 2){
-
+        if(state == 3){
             while(!donePath && finish != -1){ //"while the path-tracing isn't done" and only run if the finish index has been set
                 int x, y;
                 x = done[finish].x;
@@ -375,7 +390,7 @@ int main()
                 window.draw(subtitle);
             }
         }
-        if(state == 3){
+        if(state == 4){
             guesses.clear();
             finish = -1;
             donePath = false;

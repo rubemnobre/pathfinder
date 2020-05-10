@@ -367,7 +367,7 @@ int main()
                 subtitle.setFillColor(sf::Color::White);
                 window.draw(subtitle);
             }else{
-                std::string sub("Done tracing path. Right arrow to restart. g(n) - h(n) = ");
+                std::string sub("Done tracing path. Right arrow to restart. g(n) - h(0) = ");
                 sub += std::to_string(guesses[0].g - heuristic(startx, starty));
                 sf::Text subtitle(sub, font, 10);
                 subtitle.setPosition(0, size);
